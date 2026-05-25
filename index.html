@@ -630,9 +630,9 @@ function renderCharGrid() {
 //  난이도 / 모드 설정
 // ══════════════════════════════════════════
 const DIFFICULTIES = {
-  easy:   {label:'쉬움🌱',   time:40, speedMult:.7,  spawnBase:.013, spawnGrow:.0007, rockChance:.12, playerSpeed:8, robotSpeed:3.5, roboThink:22, roboAccuracy:.6, roboMiss:.35},
-  normal: {label:'보통⭐',   time:30, speedMult:1.0,  spawnBase:.018, spawnGrow:.0012, rockChance:.22, playerSpeed:7, robotSpeed:5.5, roboThink:14, roboAccuracy:.82, roboMiss:.15},
-  hard:   {label:'어려움🔥', time:25, speedMult:2.6,  spawnBase:.03,  spawnGrow:.0022, rockChance:.33, playerSpeed:6, robotSpeed:8.5, roboThink:6,  roboAccuracy:.97, roboMiss:.04},
+  easy:   {label:'쉬움🌱',   time:40, speedMult:.7,  spawnBase:.013, spawnGrow:.0007, rockChance:.55, playerSpeed:8, robotSpeed:3.5, roboThink:22, roboAccuracy:.6, roboMiss:.35},
+  normal: {label:'보통⭐',   time:30, speedMult:1.0,  spawnBase:.018, spawnGrow:.0012, rockChance:.68, playerSpeed:7, robotSpeed:5.5, roboThink:14, roboAccuracy:.82, roboMiss:.15},
+  hard:   {label:'어려움🔥', time:25, speedMult:2.6,  spawnBase:.03,  spawnGrow:.0022, rockChance:.80, playerSpeed:6, robotSpeed:8.5, roboThink:6,  roboAccuracy:.97, roboMiss:.04},
 };
 
 let selectedCharIdx=0, selectedDiff='easy', selectedMode='solo', vsTimeSec=30;
@@ -784,24 +784,56 @@ function lerpColor(a, b, t) {
   return `#${((1<<24)|(r<<16)|(g<<8)|bl).toString(16).slice(1)}`;
 }
 
-function makeCoin(zone) {
+function makeCoin(zone, forceRock, nearX) {
   const diff=DIFFICULTIES[selectedDiff];
-  const isRock=Math.random()<diff.rockChance;
+  const isRock = forceRock!==undefined ? forceRock : Math.random()<diff.rockChance;
   const pool=isRock?coinTypes.filter(t=>t.type==='rock'):coinTypes.filter(t=>t.type==='coin');
   const t=pool[Math.floor(Math.random()*pool.length)];
   const lvl=1+Math.floor((diff.time-timeLeft)/8);
   const xMin=zone==='P'?(vsMode?12:12):HALF+12;
   const xMax=zone==='P'?(vsMode?HALF-12:W-12):W-12;
-  return { zone, x:xMin+Math.random()*(xMax-xMin), y:-28,
-    size:t.size, type:t.type, pts:t.pts, color:t.color, shine:t.shine, edge:t.edge, diamond:!!t.diamond,
+  // 돌이고 nearX가 있으면 그 옆에서 떨어짐
+  let x;
+  if(isRock && nearX!==undefined){
+    const offset = (Math.random()<.5?1:-1) * (20+Math.random()*28);
+    x = Math.min(xMax, Math.max(xMin, nearX+offset));
+  } else {
+    x = xMin+Math.random()*(xMax-xMin);
+  }
+  return { zone, x, y:-28,
+    size:t.size, type:t.type, pts:t.pts, color:t.color, shine:t.shine, edge:t.edge, star:!!t.star, big:!!t.big,
     speed:(t.speed+lvl*.3)*diff.speedMult,
     wobble:Math.random()*Math.PI*2, wobbleSpeed:.03+Math.random()*.04,
     rot:Math.random()*Math.PI*2, rotSpeed:(Math.random()-.5)*.06 };
 }
 
 function spawnCoins() {
-  coins.push(makeCoin('P'));
-  if(vsMode) coins.push(makeCoin('R'));
+  const diff=DIFFICULTIES[selectedDiff];
+  const xMinP=vsMode?12:12, xMaxP=vsMode?HALF-12:W-12;
+  const xMinR=HALF+12, xMaxR=W-12;
+
+  // 플레이어 구역: 코인 하나 생성 후, 돌은 그 코인 옆에
+  const isRockP=Math.random()<diff.rockChance;
+  if(isRockP){
+    // 먼저 코인 X 위치 정하고, 돌을 그 옆에
+    const coinX=xMinP+Math.random()*(xMaxP-xMinP);
+    coins.push(makeCoin('P',false,undefined));
+    coins.push(makeCoin('P',true,coinX));
+  } else {
+    coins.push(makeCoin('P',false,undefined));
+  }
+
+  // 로봇 구역
+  if(vsMode){
+    const isRockR=Math.random()<diff.rockChance;
+    if(isRockR){
+      const coinX=xMinR+Math.random()*(xMaxR-xMinR);
+      coins.push(makeCoin('R',false,undefined));
+      coins.push(makeCoin('R',true,coinX));
+    } else {
+      coins.push(makeCoin('R',false,undefined));
+    }
+  }
 }
 
 // ══════════════════════════════════════════
